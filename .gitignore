@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Dados locais de downloads e deduplicação
+down_pics/
+down_pics/*
+dedupe_map.json
+download_history.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
