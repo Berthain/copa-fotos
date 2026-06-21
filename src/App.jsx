@@ -12,22 +12,30 @@ export default function App() {
   // Se true, utiliza streaming SSE para receber progresso em tempo real.
   const [useStream, setUseStream] = useState(true);
 
-  // Referência para o input file oculto de seleção de pasta.
-  const folderInputRef = useRef(null);
-
   // Abre o diálogo nativo de seleção de pasta do sistema operacional.
-  function handleSelectFolder() {
-    folderInputRef.current?.click();
-  }
-
-  // Processa a pasta selecionada e atualiza o estado.
-  function handleFolderSelect(e) {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      // Extrai o caminho da pasta a partir do primeiro arquivo selecionado.
-      const filePath = files[0].webkitRelativePath || files[0].name;
-      const folderPath = filePath.substring(0, filePath.lastIndexOf("/"));
-      setFolder(folderPath || files[0].name);
+  async function handleSelectFolder() {
+    try {
+      // Tenta usar a File System Access API (navegadores modernos)
+      if (window.showDirectoryPicker) {
+        const dirHandle = await window.showDirectoryPicker();
+        const folderName = dirHandle.name;
+        setFolder(folderName);
+        alert(`✅ Pasta selecionada: ${folderName}`);
+      } else {
+        // Fallback: solicita que o usuário digite manualmente
+        const path = prompt(
+          "Seu navegador não suporta seleção de pasta gráfica.\n\nDigite o caminho completo da pasta:",
+          "down_pics"
+        );
+        if (path) {
+          setFolder(path);
+        }
+      }
+    } catch (err) {
+      // Usuário cancelou
+      if (err.name !== "AbortError") {
+        console.error("Erro ao selecionar pasta:", err);
+      }
     }
   }
 
@@ -183,15 +191,6 @@ França x Alemanha`}
       >
         📁 Selecionar Pasta
       </button>
-
-      {/* Input hidden para diálogo de seleção de pasta (webkitdirectory permite pasta inteira) */}
-      <input
-        ref={folderInputRef}
-        type="file"
-        webkitdirectory="true"
-        style={{ display: "none" }}
-        onChange={handleFolderSelect}
-      />
 
       <br />
       <br />

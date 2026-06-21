@@ -56,6 +56,7 @@ async function fetchWikimediaImages(query, limit = 20) {
   // licenciadas para uso livre. Busca via Wikipedia search integrado.
   // Filtra apenas extensões de imagem válidas para evitar PDFs e outros tipos.
   const validExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"];
+  const forbiddenExtensions = [".pdf", ".doc", ".docx", ".txt", ".zip", ".rar"];
 
   const response = await axios.get("https://commons.wikimedia.org/w/api.php", {
     params: {
@@ -63,7 +64,7 @@ async function fetchWikimediaImages(query, limit = 20) {
       list: "search",
       srsearch: query,
       srprop: "size",
-      srlimit: Math.min(limit * 3, 100), // Busca mais para filtrar
+      srlimit: Math.min(limit * 5, 150), // Busca muito mais para filtrar agressivamente
       srnamespace: "6", // File namespace (imagens)
       format: "json",
     },
@@ -81,6 +82,13 @@ async function fetchWikimediaImages(query, limit = 20) {
   for (const item of searchResults) {
     if (imageData.length >= limit) break; // Para quando atinge o limite
     
+    // Valida nome do arquivo ANTES de fazer requisição (economia de tempo)
+    const titleLower = item.title.toLowerCase();
+    const isForbidden = forbiddenExtensions.some(ext => titleLower.includes(ext));
+    if (isForbidden) {
+      continue; // Pula PDFs, documentos, etc antes de fazer requisição
+    }
+
     try {
       const detailsResponse = await axios.get("https://commons.wikimedia.org/w/api.php", {
         params: {
@@ -102,11 +110,28 @@ async function fetchWikimediaImages(query, limit = 20) {
       if (page?.imageinfo?.[0]?.url) {
         const info = page.imageinfo[0];
         const urlString = info.url;
+        const titleLower = item.title.toLowerCase();
         
-        // Filtra apenas extensões de imagem válidas (rejeita PDFs, documentos, etc)
-        const isValidImage = validExtensions.some(ext => urlString.toLowerCase().includes(ext));
-        if (!isValidImage) {
-          continue; // Pula arquivos que não são imagens
+        // Rejeição agressiva de não-imagens
+        if (
+          urlString.includes(".pdf") ||
+          titleLower.includes(".pdf") ||
+          urlString.includes(".doc") ||
+          titleLower.includes(".doc") ||
+          urlString.includes(".txt") ||
+          titleLower.includes(".txt") ||
+          urlString.includes(".zip") ||
+          urlString.includes(".rar")
+        ) {
+          continue; // Pula arquivo
+        }
+        
+        // Filtra apenas extensões de imagem válidas
+        const cleanUrl = urlString.toLowerCase().split(/[?#]/)[0];
+        const hasValidExtension = validExtensions.some(ext => cleanUrl.endsWith(ext));
+        
+        if (!hasValidExtension) {
+          continue; // Pula se não terminar com extensão de imagem válida
         }
 
         imageData.push({
