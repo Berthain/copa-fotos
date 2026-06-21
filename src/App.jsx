@@ -1,5 +1,17 @@
 import { useState, useRef } from "react";
 
+export default function App() {
+  // Estado do textarea com as partidas informadas pelo usuário.
+  const [matches, setMatches] = useState("");
+  // Pasta de destino onde o backend irá salvar as imagens.
+  const [folder, setFolder] = useState("");
+  // Texto de status exibido na interface durante o processo.
+  const [status, setStatus] = useState("Pronto");
+  // Resultados retornados pelo backend após o processamento.
+  const [results, setResults] = useState([]);
+  // Se true, utiliza streaming SSE para receber progresso em tempo real.
+  const [useStream, setUseStream] = useState(true);
+
   // Referência para o input file oculto de seleção de pasta.
   const folderInputRef = useRef(null);
 

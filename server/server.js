@@ -54,13 +54,16 @@ function extractExtension(url) {
 async function fetchWikimediaImages(query, limit = 20) {
   // Wikimedia Commons oferece API completamente aberta com milhões de imagens
   // licenciadas para uso livre. Busca via Wikipedia search integrado.
+  // Filtra apenas extensões de imagem válidas para evitar PDFs e outros tipos.
+  const validExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"];
+
   const response = await axios.get("https://commons.wikimedia.org/w/api.php", {
     params: {
       action: "query",
       list: "search",
       srsearch: query,
       srprop: "size",
-      srlimit: Math.min(limit, 50),
+      srlimit: Math.min(limit * 3, 100), // Busca mais para filtrar
       srnamespace: "6", // File namespace (imagens)
       format: "json",
     },
@@ -75,7 +78,9 @@ async function fetchWikimediaImages(query, limit = 20) {
   const imageData = [];
 
   // Busca detalhes de cada arquivo encontrado
-  for (const item of searchResults.slice(0, limit)) {
+  for (const item of searchResults) {
+    if (imageData.length >= limit) break; // Para quando atinge o limite
+    
     try {
       const detailsResponse = await axios.get("https://commons.wikimedia.org/w/api.php", {
         params: {
@@ -96,9 +101,17 @@ async function fetchWikimediaImages(query, limit = 20) {
 
       if (page?.imageinfo?.[0]?.url) {
         const info = page.imageinfo[0];
+        const urlString = info.url;
+        
+        // Filtra apenas extensões de imagem válidas (rejeita PDFs, documentos, etc)
+        const isValidImage = validExtensions.some(ext => urlString.toLowerCase().includes(ext));
+        if (!isValidImage) {
+          continue; // Pula arquivos que não são imagens
+        }
+
         imageData.push({
-          url: info.url,
-          titulo: item.title.replace(/File:|\.jpg|\.png|\.gif|\.webp/i, "").trim(),
+          url: urlString,
+          titulo: item.title.replace(/File:|\.jpg|\.jpeg|\.png|\.gif|\.webp|\.svg/i, "").trim(),
           fonte: `Wikimedia Commons - ${info.user || "Unknown"}`,
           origem: `https://commons.wikimedia.org/wiki/${item.title.replace(/ /g, "_")}`,
         });
