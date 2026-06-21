@@ -50,66 +50,84 @@ function extractExtension(url) {
   return ".jpg";
 }
 
-async function getDuckDuckGoToken(query) {
-  // Busca a página de pesquisa do DuckDuckGo e extrai o token vqd necessário
-  // para consultar a API de imagens.
-  const response = await axios.get("https://duckduckgo.com/", {
-    params: { q: query },
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+// Busca imagens via Wikimedia Commons API (API pública, sem autenticação).
+async function fetchWikimediaImages(query, limit = 20) {
+  // Wikimedia Commons oferece API completamente aberta com milhões de imagens
+  // licenciadas para uso livre. Busca via Wikipedia search integrado.
+  const response = await axios.get("https://commons.wikimedia.org/w/api.php", {
+    params: {
+      action: "query",
+      list: "search",
+      srsearch: query,
+      srprop: "size",
+      srlimit: Math.min(limit, 50),
+      srnamespace: "6", // File namespace (imagens)
+      format: "json",
     },
-    timeout: 10000,
-  });
-
-  const match = response.data.match(/vqd='([\d-]+)'/);
-  if (!match) {
-    throw new Error("Não foi possível obter token de busca DuckDuckGo");
-  }
-  return match[1];
-}
-
-async function fetchDuckDuckGoImages(query, limit = 20) {
-  // Faz a busca de imagens no DuckDuckGo e normaliza o resultado.
-  const vqd = await getDuckDuckGoToken(query);
-  const params = new URLSearchParams({ q: query, ia: "images", o: "json", vqd });
-
-  const response = await axios.get(`https://duckduckgo.com/i.js?${params.toString()}`, {
     headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      Accept: "application/json, text/javascript, */*; q=0.01",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      Accept: "application/json",
     },
     timeout: 15000,
   });
 
-  const results = response.data?.results ?? [];
-  return results
-    .filter((item) => item.image)
-    .slice(0, limit)
-    .map((item) => ({
-      url: item.image,
-      titulo: item.title || item.alt || query,
-      fonte: item.source || item.url || query,
-      origem: item.url || item.image,
-    }));
+  const searchResults = response.data?.query?.search ?? [];
+  const imageData = [];
+
+  // Busca detalhes de cada arquivo encontrado
+  for (const item of searchResults.slice(0, limit)) {
+    try {
+      const detailsResponse = await axios.get("https://commons.wikimedia.org/w/api.php", {
+        params: {
+          action: "query",
+          titles: item.title,
+          prop: "imageinfo|info",
+          iiprop: "url|user|timestamp",
+          format: "json",
+        },
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        },
+        timeout: 10000,
+      });
+
+      const pages = detailsResponse.data?.query?.pages ?? {};
+      const page = Object.values(pages)[0];
+
+      if (page?.imageinfo?.[0]?.url) {
+        const info = page.imageinfo[0];
+        imageData.push({
+          url: info.url,
+          titulo: item.title.replace(/File:|\.jpg|\.png|\.gif|\.webp/i, "").trim(),
+          fonte: `Wikimedia Commons - ${info.user || "Unknown"}`,
+          origem: `https://commons.wikimedia.org/wiki/${item.title.replace(/ /g, "_")}`,
+        });
+      }
+    } catch (err) {
+      // Continua para o próximo item se houver erro
+      console.error(`Erro ao buscar detalhes de ${item.title}:`, err.message);
+    }
+  }
+
+  return imageData.slice(0, limit);
 }
 
 async function searchImagesForMatch(match, maxResults = 20) {
   // Constrói múltiplas variações de pesquisa para garantir maior cobertura
   // de imagens relacionadas à partida e ao contexto esportivo.
   const queries = [
+    `${match} futebol`,
     `${match}`,
-    `${match} futebol`
+    `${match} football`,
   ];
 
   const seenUrls = new Set();
   const results = [];
 
   for (const query of queries) {
+    if (results.length >= maxResults) break;
     try {
-      const images = await fetchDuckDuckGoImages(query, maxResults);
+      const images = await fetchWikimediaImages(query, maxResults);
       for (const image of images) {
         if (!seenUrls.has(image.url) && results.length < maxResults) {
           seenUrls.add(image.url);
@@ -118,9 +136,6 @@ async function searchImagesForMatch(match, maxResults = 20) {
       }
     } catch (err) {
       console.error(`Erro ao buscar imagens para query=${query}:`, err.message);
-    }
-    if (results.length >= maxResults) {
-      break;
     }
   }
 

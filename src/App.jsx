@@ -1,16 +1,23 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 
-export default function App() {
-  // Estado do textarea com as partidas informadas pelo usuário.
-  const [matches, setMatches] = useState("");
-  // Pasta de destino onde o backend irá salvar as imagens.
-  const [folder, setFolder] = useState("");
-  // Texto de status exibido na interface durante o processo.
-  const [status, setStatus] = useState("Pronto");
-  // Resultados retornados pelo backend após o processamento.
-  const [results, setResults] = useState([]);
-  // Se true, utiliza streaming SSE para receber progresso em tempo real.
-  const [useStream, setUseStream] = useState(true);
+  // Referência para o input file oculto de seleção de pasta.
+  const folderInputRef = useRef(null);
+
+  // Abre o diálogo nativo de seleção de pasta do sistema operacional.
+  function handleSelectFolder() {
+    folderInputRef.current?.click();
+  }
+
+  // Processa a pasta selecionada e atualiza o estado.
+  function handleFolderSelect(e) {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      // Extrai o caminho da pasta a partir do primeiro arquivo selecionado.
+      const filePath = files[0].webkitRelativePath || files[0].name;
+      const folderPath = filePath.substring(0, filePath.lastIndexOf("/"));
+      setFolder(folderPath || files[0].name);
+    }
+  }
 
   async function searchMatches() {
     try {
@@ -151,10 +158,27 @@ França x Alemanha`}
 
       <input
         type="text"
-        style={{ width: "500px" }}
+        style={{ width: "400px" }}
         placeholder="Pasta de destino"
         value={folder}
         onChange={(e) => setFolder(e.target.value)}
+      />
+
+      {/* Botão para selecionar pasta graficamente */}
+      <button
+        onClick={handleSelectFolder}
+        style={{ marginLeft: 8, padding: "6px 12px", cursor: "pointer" }}
+      >
+        📁 Selecionar Pasta
+      </button>
+
+      {/* Input hidden para diálogo de seleção de pasta (webkitdirectory permite pasta inteira) */}
+      <input
+        ref={folderInputRef}
+        type="file"
+        webkitdirectory="true"
+        style={{ display: "none" }}
+        onChange={handleFolderSelect}
       />
 
       <br />

@@ -5,7 +5,7 @@ Aplicação web para busca, download e organização automática de imagens rela
 
 ## Funcionalidades
 
-✅ **Busca de imagens por partida**: Pesquisa automática de imagens via DuckDuckGo  
+✅ **Busca de imagens por partida**: Pesquisa automática de imagens via Wikimedia Commons  
 ✅ **Organização automática**: Cria pastas por partida automaticamente  
 ✅ **Streaming em tempo real**: Exibe progresso de download conforme acontece via SSE  
 ✅ **Controle de duplicidade**: Detecta e evita downloads duplicados usando hash SHA256  
